@@ -144,6 +144,49 @@ jobs:
             fi
           done
 
+  run-lab-tests:
+    runs-on: ubuntu-latest
+    name: Lab Validation Tests
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: "TestPassword123!"
+          MSSQL_PID: Developer
+        options: >-
+          --health-cmd="/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P TestPassword123! -Q 'SELECT 1' || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 1433:1433
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Wait for SQL Server
+        run: |
+          timeout 60s bash -c 'until nc -z localhost 1433; do sleep 2; done'
+
+      - name: Setup Sample Database
+        run: |
+          echo "Setting up SampleEcommerce database..."
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P TestPassword123! -i examples/setup-sample-database.sql
+
+      - name: Run Lab Validation Tests
+        continue-on-error: true
+        run: |
+          echo "Running LAB-01 validation tests..."
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P TestPassword123! -d SampleEcommerce -i tests/run-lab-validation.sql
+
+      - name: Run Quick Diagnostics
+        continue-on-error: true
+        run: |
+          echo "Running quick diagnostics..."
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P TestPassword123! -d SampleEcommerce -i scripts/quick-diagnostics.sql
+
   check-project-health:
     runs-on: ubuntu-latest
     name: Project Health Check
@@ -155,7 +198,7 @@ jobs:
         run: |
           echo "Checking essential project files..."
 
-          files=("README.md" "LICENSE" ".gitignore" "MASTER-INDEX.md")
+          files=("README.md" "LICENSE" ".gitignore" "MASTER-INDEX.md" "STATUS.md")
 
           for file in "${files[@]}"; do
             if [ -f "$file" ]; then
@@ -169,7 +212,7 @@ jobs:
         run: |
           echo "Checking documentation structure..."
 
-          dirs=("examples" "labs" "case-studies" ".github")
+          dirs=("examples" "labs" "case-studies" ".github" "tests" "scripts")
 
           for dir in "${dirs[@]}"; do
             if [ -d "$dir" ]; then
@@ -181,6 +224,19 @@ jobs:
             fi
           done
 
+      - name: Check for test files
+        run: |
+          echo "Checking test files..."
+          files=("tests/run-lab-validation.sql" "scripts/quick-diagnostics.sql")
+
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "⚠️  Missing: $file"
+            fi
+          done
+
       - name: Generate validation report
         if: always()
         run: |
@@ -189,4 +245,6 @@ jobs:
           echo "- **SQL Scripts**: Validated" >> $GITHUB_STEP_SUMMARY
           echo "- **Markdown Files**: Validated" >> $GITHUB_STEP_SUMMARY
           echo "- **Cross-references**: Checked" >> $GITHUB_STEP_SUMMARY
+          echo "- **Lab Tests**: Executed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quick Diagnostics**: Executed" >> $GITHUB_STEP_SUMMARY
           echo "- **Project Health**: ✓" >> $GITHUB_STEP_SUMMARY
