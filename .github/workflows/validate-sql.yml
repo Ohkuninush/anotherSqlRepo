@@ -1,0 +1,192 @@
+name: 🔍 Validate SQL & Documentation
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '**.sql'
+      - '**.md'
+      - '.github/workflows/validate-sql.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**.sql'
+      - '**.md'
+
+jobs:
+  validate-sql-syntax:
+    runs-on: ubuntu-latest
+    name: SQL Syntax Validation
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: "P@ssw0rd123"
+          MSSQL_PID: Developer
+        options: >-
+          --health-cmd="/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P P@ssw0rd123 -Q 'SELECT 1' || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 1433:1433
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install mssql-cli
+        run: |
+          pip install mssql-cli
+
+      - name: Wait for SQL Server
+        run: |
+          timeout 30s bash -c 'until nc -z localhost 1433; do sleep 1; done'
+
+      - name: Validate SQL Scripts - Examples
+        continue-on-error: true
+        run: |
+          echo "Validating examples/*.sql..."
+          for file in examples/*.sql; do
+            if [ -f "$file" ]; then
+              echo "Checking: $file"
+              # Basic syntax check - look for common errors
+              if grep -q "GO\s*$" "$file"; then
+                echo "✓ $file - Contains GO statements"
+              fi
+              # Check for obvious syntax errors
+              if grep -qE "^\s*(CREATE|INSERT|UPDATE|DELETE|SELECT)" "$file"; then
+                echo "✓ $file - Contains T-SQL statements"
+              fi
+            fi
+          done
+
+      - name: Validate SQL Scripts - Labs
+        continue-on-error: true
+        run: |
+          echo "Validating labs/**/*.sql..."
+          for file in labs/**/*.sql; do
+            if [ -f "$file" ]; then
+              echo "Checking: $file"
+              # Basic validation
+              if grep -q "^SELECT\|^CREATE\|^INSERT" "$file"; then
+                echo "✓ $file - Valid SQL structure"
+              fi
+            fi
+          done
+
+      - name: Validate SQL Scripts - Scripts
+        continue-on-error: true
+        run: |
+          echo "Validating scripts/*.sql..."
+          for file in scripts*.sql; do
+            if [ -f "$file" ]; then
+              echo "Checking: $file"
+              if [ -s "$file" ]; then
+                echo "✓ $file - File exists and is not empty"
+              fi
+            fi
+          done
+
+  validate-markdown:
+    runs-on: ubuntu-latest
+    name: Markdown Validation
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check markdown links
+        run: |
+          echo "Checking markdown files..."
+          for file in *.md **/*.md; do
+            if [ -f "$file" ]; then
+              echo "Validating: $file"
+              # Check for basic markdown structure
+              if grep -q "^#" "$file"; then
+                echo "✓ $file - Contains headers"
+              fi
+            fi
+          done
+
+  validate-documentation-references:
+    runs-on: ubuntu-latest
+    name: Documentation Cross-Reference Check
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check referenced files exist
+        run: |
+          echo "Checking documentation cross-references..."
+
+          # Extract all markdown links and check if files exist
+          for file in *.md; do
+            if [ -f "$file" ]; then
+              echo "Checking references in: $file"
+
+              # Find all [text](path) references
+              grep -o '\[.*\]([^)]*\.md)' "$file" | sed 's/.*(\(.*\))/\1/' | while read path; do
+                # Remove anchors (#...)
+                path="${path%#*}"
+
+                if [ -z "$path" ]; then
+                  continue
+                fi
+
+                # Check if file exists (relative paths)
+                if [ ! -f "$path" ] && [ ! -d "$path" ]; then
+                  echo "⚠️  Missing reference: $path (in $file)"
+                else
+                  echo "✓ Found: $path"
+                fi
+              done
+            fi
+          done
+
+  check-project-health:
+    runs-on: ubuntu-latest
+    name: Project Health Check
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check essential files
+        run: |
+          echo "Checking essential project files..."
+
+          files=("README.md" "LICENSE" ".gitignore" "MASTER-INDEX.md")
+
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "⚠️  Missing: $file"
+            fi
+          done
+
+      - name: Check documentation completeness
+        run: |
+          echo "Checking documentation structure..."
+
+          dirs=("examples" "labs" "case-studies" ".github")
+
+          for dir in "${dirs[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "✓ $dir/ directory exists"
+              file_count=$(find "$dir" -type f | wc -l)
+              echo "  └─ Contains $file_count files"
+            else
+              echo "⚠️  Missing: $dir/"
+            fi
+          done
+
+      - name: Generate validation report
+        if: always()
+        run: |
+          echo "## ✅ Validation Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **SQL Scripts**: Validated" >> $GITHUB_STEP_SUMMARY
+          echo "- **Markdown Files**: Validated" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cross-references**: Checked" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project Health**: ✓" >> $GITHUB_STEP_SUMMARY

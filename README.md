@@ -1,5 +1,11 @@
 # 🚀 SQL Server Expert Skill - Enterprise Edition
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Status: Production Ready](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](STATUS.md)
+[![Validation](https://github.com/Ohkuninush/anotherSqlRepo/workflows/Validate%20SQL%20&%20Documentation/badge.svg)](https://github.com/Ohkuninush/anotherSqlRepo/actions)
+[![SQL Server 2019+](https://img.shields.io/badge/SQL%20Server-2019%2B-blue)](README.md)
+[![Documentation](https://img.shields.io/badge/Documentation-40%2B%20Files-informational)](MASTER-INDEX.md)
+
 A comprehensive enterprise-grade SQL Server expertise system with 25 advanced capabilities, production code patterns, and testing frameworks.
 
 ## 📋 Overview
