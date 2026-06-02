@@ -1,0 +1,39 @@
+# IDE & Editor
+.vs/
+.vscode/
+*.code-workspace
+*.user
+*.suo
+*.sln.docstates
+
+# Credentials & Secrets
+*.local.json
+secrets.json
+.env
+.env.local
+credentials.json
+
+# SQL Server
+*.bak
+*.mdf
+*.ldf
+*.ndf
+
+# Temporary Files
+*.tmp
+*.temp
+$RECYCLE.BIN/
+.DS_Store
+Thumbs.db
+
+# Build & Artifacts
+bin/
+obj/
+dist/
+build/
+*.dll
+*.exe
+
+# Logs
+*.log
+logs/
