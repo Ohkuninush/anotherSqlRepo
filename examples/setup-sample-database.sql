@@ -229,47 +229,86 @@ GO
 -- Generate orders with realistic dates (last 6 months)
 DECLARE @Counter INT = 1
 DECLARE @MaxOrders INT = 1000
+DECLARE @CustomerID INT
+DECLARE @OrderDate DATETIME2
+DECLARE @Status NVARCHAR(20)
+DECLARE @TotalAmount DECIMAL(12,2)
+DECLARE @OrderID INT
+DECLARE @ItemCount INT
+DECLARE @ItemCounter INT
+DECLARE @ProductID INT
+DECLARE @Quantity INT
+DECLARE @UnitPrice DECIMAL(10,2)
+DECLARE @LineTotal DECIMAL(12,2)
 
 WHILE @Counter <= @MaxOrders
 BEGIN
-    DECLARE @CustomerID INT = (@Counter % 100) + 1
-    DECLARE @OrderDate DATETIME2 = DATEADD(HOUR, -(@Counter * 2), GETDATE())
-    DECLARE @Status NVARCHAR(20) = CASE
-        WHEN @Counter % 10 = 0 THEN 'Pending'
-        WHEN @Counter % 10 = 1 THEN 'Processing'
-        WHEN @Counter % 10 = 2 THEN 'Shipped'
-        ELSE 'Delivered'
-    END
+    BEGIN TRY
+        -- ✅ FIX #1: Initialize variables for this iteration
+        SET @CustomerID = (@Counter % 100) + 1
+        SET @OrderDate = DATEADD(HOUR, -(@Counter * 2), GETDATE())
+        SET @Status = CASE
+            WHEN @Counter % 10 = 0 THEN 'Pending'
+            WHEN @Counter % 10 = 1 THEN 'Processing'
+            WHEN @Counter % 10 = 2 THEN 'Shipped'
+            ELSE 'Delivered'
+        END
+        SET @TotalAmount = 0
 
-    DECLARE @TotalAmount DECIMAL(12,2) = 0
+        -- ✅ FIX #2: Insert Order with explicit TotalAmount = 0
+        INSERT INTO Orders (CustomerID, OrderDate, Status, TotalAmount)
+        VALUES (@CustomerID, @OrderDate, @Status, 0)
 
-    INSERT INTO Orders (CustomerID, OrderDate, Status)
-    VALUES (@CustomerID, @OrderDate, @Status)
+        SET @OrderID = SCOPE_IDENTITY()
 
-    DECLARE @OrderID INT = SCOPE_IDENTITY()
+        -- ✅ FIX #3: Validate OrderID was created
+        IF @OrderID IS NULL
+        BEGIN
+            RAISERROR ('Failed to create OrderID', 16, 1)
+        END
 
-    -- Add 1-5 items per order
-    DECLARE @ItemCount INT = (@Counter % 5) + 1
-    DECLARE @ItemCounter INT = 1
+        -- Add 1-5 items per order
+        SET @ItemCount = (@Counter % 5) + 1
+        SET @ItemCounter = 1
 
-    WHILE @ItemCounter <= @ItemCount
-    BEGIN
-        DECLARE @ProductID INT = ((@Counter + @ItemCounter) % 50) + 1
-        DECLARE @Quantity INT = (@ItemCounter % 3) + 1
-        DECLARE @UnitPrice DECIMAL(10,2) = (SELECT Price FROM Products WHERE ProductID = @ProductID)
-        DECLARE @LineTotal DECIMAL(12,2) = @Quantity * @UnitPrice
+        WHILE @ItemCounter <= @ItemCount
+        BEGIN
+            SET @ProductID = ((@Counter + @ItemCounter) % 50) + 1
+            SET @Quantity = (@ItemCounter % 3) + 1
 
-        INSERT INTO OrderDetails (OrderID, ProductID, Quantity, UnitPrice, LineTotal)
-        VALUES (@OrderID, @ProductID, @Quantity, @UnitPrice, @LineTotal)
+            -- ✅ FIX #4: Get product price with NULL check
+            SELECT @UnitPrice = Price FROM Products WHERE ProductID = @ProductID
 
-        SET @TotalAmount = @TotalAmount + @LineTotal
-        SET @ItemCounter = @ItemCounter + 1
-    END
+            IF @UnitPrice IS NULL
+            BEGIN
+                SET @UnitPrice = 0  -- Skip product if not found (don't fail the entire order)
+                SET @ItemCounter = @ItemCounter + 1
+                CONTINUE
+            END
 
-    UPDATE Orders SET TotalAmount = @TotalAmount WHERE OrderID = @OrderID
-    UPDATE Customers SET TotalSpent = TotalSpent + @TotalAmount WHERE CustomerID = @CustomerID
+            SET @LineTotal = @Quantity * @UnitPrice
 
-    SET @Counter = @Counter + 1
+            -- ✅ FIX #5: Insert order detail
+            INSERT INTO OrderDetails (OrderID, ProductID, Quantity, UnitPrice, LineTotal)
+            VALUES (@OrderID, @ProductID, @Quantity, @UnitPrice, @LineTotal)
+
+            SET @TotalAmount = @TotalAmount + @LineTotal
+            SET @ItemCounter = @ItemCounter + 1
+        END
+
+        -- ✅ FIX #6: Update TotalAmount with calculated value
+        IF @TotalAmount > 0
+        BEGIN
+            UPDATE Orders SET TotalAmount = @TotalAmount WHERE OrderID = @OrderID
+            UPDATE Customers SET TotalSpent = TotalSpent + @TotalAmount WHERE CustomerID = @CustomerID
+        END
+
+        SET @Counter = @Counter + 1
+    END TRY
+    BEGIN CATCH
+        SET @Counter = @Counter + 1
+        -- Continue processing other orders even if one fails
+    END CATCH
 END
 
 GO
