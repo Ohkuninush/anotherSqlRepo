@@ -68,6 +68,27 @@ This repository contains a complete SQL Server knowledge base designed to suppor
 
 ## 🚀 Quick Start
 
+### For Developers: Real-World Learning
+Want to learn by doing? Start with **practical case studies**:
+
+1. **[Case Study 01: Query Performance Crisis](case-studies/CASE-STUDY-01-query-performance-crisis.md)**
+   - Problem: Dashboard query taking 47 seconds
+   - Solution: Fix using date ranges instead of YEAR() function
+   - Gain: 39x performance improvement
+   - Executable SQL scripts included
+
+2. **[Example Database Setup](examples/setup-sample-database.sql)**
+   - Create sample ecommerce database
+   - ~3,000 realistic records
+   - Ready for all examples and labs
+
+3. **[Examples by Topic](examples/)**
+   - Working code examples for each concept
+   - Copy/paste ready
+   - Tested and verified
+
+---
+
 ### 1. Find Your Problem
 Open **[`MASTER-INDEX.md`](MASTER-INDEX.md)** - it maps every common SQL Server problem to solutions:
 - 🚀 Performance issues
